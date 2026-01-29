@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>📱 Partner Ringer Pro</title>
+
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#ff006e">
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:system-ui,sans-serif;background:linear-gradient(135deg,#0f0f23,#1a1a35);color:#fff;min-height:100vh;display:flex;justify-content:center;align-items:center;padding:10px}
+.container{width:100%;max-width:420px;background:#1a1a35;border-radius:20px;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,.5)}
+.header{background:linear-gradient(135deg,#ff006e,#8338ec);padding:25px;text-align:center;position:relative}
+.status{position:absolute;top:10px;right:10px;width:12px;height:12px;border-radius:50%;background:#06ffa5;box-shadow:0 0 10px #06ffa5}
+.status.offline{background:#ff006e;box-shadow:0 0 10px #ff006e}
+.content{padding:25px}
+input,button,select{width:100%;padding:15px;margin-bottom:15px;border-radius:12px;border:none;font-size:1em}
+input,select{background:#0f0f23;color:#fff;border:2px solid #8338ec}
+button{background:#ff006e;color:#fff;font-weight:bold;cursor:pointer;transition:all .2s}
+button:hover{transform:translateY(-2px);box-shadow:0 5px 15px rgba(255,0,110,.4)}
+button:active{transform:translateY(0)}
+button:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.incoming{display:none;padding:25px;border-radius:15px;border:2px solid #ff006e;text-align:center;background:#1a1a35;animation:pulse 2s infinite}
+.incoming.active{display:block}
+@keyframes pulse{0%,100%{border-color:#ff006e}50%{border-color:#8338ec}}
+.dismiss{background:#06ffa5;color:#000;margin-top:10px}
+.callback{background:#8338ec;margin-top:5px}
+.small{font-size:.85em;opacity:.8;text-align:center;margin-bottom:8px}
+.tabs{display:flex;border-bottom:2px solid #8338ec;margin-bottom:20px}
+.tab{flex:1;padding:12px;text-align:center;cursor:pointer;background:transparent;border:none;color:#fff;opacity:.6;transition:all .2s}
+.tab.active{opacity:1;border-bottom:3px solid #ff006e;margin-bottom:-2px}
+.tab-content{display:none}
+.tab-content.active{display:block}
+.history-item{background:#0f0f23;padding:15px;border-radius:10px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;border:1px solid #8338ec}
+.history-empty{text-align:center;opacity:.5;padding:30px}
+.pair-code{font-size:2em;font-weight:bold;letter-spacing:5px;color:#06ffa5;text-align:center;padding:20px;background:#0f0f23;border-radius:12px;margin:15px 0;font-family:monospace}
+.success{background:#06ffa5;color:#000;padding:10px;border-radius:8px;margin-bottom:15px;text-align:center;display:none;animation:slideIn .3s}
+@keyframes slideIn{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
+.copy-btn{background:#8338ec;padding:8px 15px;font-size:.9em;margin-top:10px}
+.queue-count{position:absolute;top:15px;left:15px;background:#ff006e;color:#fff;border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:.9em}
+</style>
+</head>
+
+<body>
+<div class="container">
+  <div class="header">
+    <div class="status" id="connectionStatus" title="Connection status"></div>
+    <div class="queue-count" id="queueCount" style="display:none">0</div>
+    <h1>📱 Partner Ringer Pro</h1>
+    <p>Real-time internet ringing</p>
+  </div>
+
+  <div class="content">
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab(0)">Ring</button>
+      <button class="tab" onclick="switchTab(1)">Pair</button>
+      <button class="tab" onclick="switchTab(2)">History</button>
+    </div>
+
+    <!-- Tab 1: Ring -->
+    <div class="tab-content active" id="tab0">
+      <div class="success" id="successMsg">✓ Call sent!</div>
+      
+      <div class="small">Your Device ID</div>
+      <input id="myId" readonly>
+      <button class="copy-btn" onclick="copyMyId()">📋 Copy My ID</button>
+
+      <div class="small" style="margin-top:20px">Partner Device ID</div>
+      <input id="partnerId" placeholder="Paste partner ID">
+
+      <button id="callBtn">📞 RING PARTNER</button>
+
+      <div class="incoming" id="incomingBox">
+        <h2>📳 Incoming Call</h2>
+        <p class="small" id="callerInfo"></p>
+        <button class="dismiss" id="dismissBtn">Dismiss</button>
+        <button class="callback" id="callbackBtn">📞 Call Back</button>
+      </div>
+    </div>
+
+    <!-- Tab 2: Pairing -->
+    <div class="tab-content" id="tab1">
+      <div class="small">Generate a pairing code to share</div>
+      <button onclick="generatePairCode()">🔗 Generate Pair Code</button>
+      
+      <div id="pairCodeDisplay" style="display:none">
+        <div class="pair-code" id="pairCode"></div>
+        <div class="small">Share this code with your partner</div>
+        <button class="copy-btn" onclick="copyPairCode()">📋 Copy Code</button>
+      </div>
+
+      <div class="small" style="margin-top:30px">Or enter a code from your partner</div>
+      <input id="pairCodeInput" placeholder="Enter 4-digit code" maxlength="4">
+      <button onclick="joinWithCode()">✓ Connect</button>
+    </div>
+
+    <!-- Tab 3: History -->
+    <div class="tab-content" id="tab2">
+      <div class="small">Recent Calls</div>
+      <div id="historyList">
+        <div class="history-empty">No call history yet</div>
+      </div>
+      <button onclick="clearHistory()" style="background:#8338ec;margin-top:10px">Clear History</button>
+    </div>
+  </div>
+</div>
+
+<audio id="ringtone" loop preload="auto">
+  <source src="soft-alarm1.mp3" type="audio/mpeg">
+</audio>
+
+<script>
+// ------------------- FIREBASE CONFIG -------------------
+const firebaseConfig = {
+  apiKey: "AIzaSyBdvlOGpTCBRgfKgZlFOCjSEZ_ZeNm_W5k",
+  authDomain: "partner-ring.firebaseapp.com",
+  databaseURL: "https://partner-ring-default-rtdb.firebaseio.com",
+  projectId: "partner-ring",
+  storageBucket: "partner-ring.firebasestorage.app",
+  messagingSenderId: "222673540127",
+  appId: "1:222673540127:web:7cad4b229f8a80b397312a",
+  measurementId: "G-Z0S6S1PSQP"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+// ------------------- CONNECTION STATUS -------------------
+const connectedRef = db.ref('.info/connected');
+connectedRef.on('value', (snap) => {
+  const status = document.getElementById('connectionStatus');
+  if (snap.val() === true) {
+    status.classList.remove('offline');
+    status.title = 'Connected';
+  } else {
+    status.classList.add('offline');
+    status.title = 'Offline';
+  }
+});
+
+// ------------------- UNIQUE DEVICE ID -------------------
+function genId(){ return 'PR-' + crypto.randomUUID().slice(0,8).toUpperCase(); }
+let myId = localStorage.getItem('PHONE_RINGER_ID');
+if(!myId){ myId = genId(); localStorage.setItem('PHONE_RINGER_ID',myId); }
+document.getElementById('myId').value = myId;
+
+// ------------------- PARTNER ID STORAGE -------------------
+let savedPartnerId = localStorage.getItem('PARTNER_ID');
+if(savedPartnerId) document.getElementById('partnerId').value = savedPartnerId;
+
+// ------------------- AUDIO & VIBRATION -------------------
+const ringtone = document.getElementById('ringtone');
+ringtone.volume = 0.35;
+let interacted=false;
+document.addEventListener('click',()=>interacted=true,{once:true});
+
+function playSound(){ 
+  if(interacted) ringtone.play().catch(()=>{}); 
+}
+
+function stopSound(){ 
+  ringtone.pause(); 
+  ringtone.currentTime=0; 
+}
+
+function vibrate(pattern = [300, 150, 300, 150, 300]){
+  if('vibrate' in navigator) navigator.vibrate(pattern);
+}
+
+// ------------------- SERVICE WORKER -------------------
+if('serviceWorker'in navigator){ 
+  navigator.serviceWorker.register('sw.js').catch(err=>console.log('SW registration failed:', err)); 
+}
+
+// ------------------- NOTIFICATIONS -------------------
+if('Notification'in window && Notification.permission === 'default'){ 
+  Notification.requestPermission(); 
+}
+
+// ------------------- CALL QUEUE -------------------
+let callQueue = [];
+let currentCaller = null;
+
+function updateQueueDisplay(){
+  const queueEl = document.getElementById('queueCount');
+  if(callQueue.length > 0){
+    queueEl.textContent = callQueue.length;
+    queueEl.style.display = 'flex';
+  } else {
+    queueEl.style.display = 'none';
+  }
+}
+
+// ------------------- CALL PARTNER -------------------
+const callBtn = document.getElementById('callBtn');
+callBtn.onclick = async () => {
+  const partner = document.getElementById('partnerId').value.trim();
+  if(!partner) return alert('⚠️ Enter partner ID');
+  if(partner === myId) return alert('⚠️ You cannot call yourself');
+  
+  callBtn.disabled = true;
+  callBtn.textContent = '📞 Ringing...';
+  vibrate([50]);
+  
+  try {
+    await db.ref('calls/'+partner).set({ 
+      from: myId, 
+      time: Date.now() 
+    });
+    
+    // Save partner ID
+    localStorage.setItem('PARTNER_ID', partner);
+    
+    // Show success message
+    const successMsg = document.getElementById('successMsg');
+    successMsg.style.display = 'block';
+    setTimeout(() => successMsg.style.display = 'none', 3000);
+    
+    // Add to history
+    addToHistory(partner, 'outgoing');
+    
+  } catch(error) {
+    alert('❌ Failed to send call: ' + error.message);
+  } finally {
+    callBtn.disabled = false;
+    callBtn.textContent = '📞 RING PARTNER';
+  }
+};
+
+// ------------------- LISTEN FOR CALLS -------------------
+db.ref('calls/'+myId).on('value', snap => {
+  const data = snap.val();
+  if(data){
+    db.ref('calls/'+myId).remove();
+    
+    // Add to queue
+    callQueue.push(data);
+    updateQueueDisplay();
+    
+    // If no current call, show this one
+    if(!currentCaller){
+      processNextCall();
+    }
+    
+    // Add to history
+    addToHistory(data.from, 'incoming');
+  }
+});
+
+// ------------------- PROCESS CALL QUEUE -------------------
+function processNextCall(){
+  if(callQueue.length === 0){
+    currentCaller = null;
+    updateQueueDisplay();
+    return;
+  }
+  
+  const data = callQueue.shift();
+  updateQueueDisplay();
+  incomingCall(data.from);
+}
+
+// ------------------- INCOMING CALL -------------------
+function incomingCall(from){
+  currentCaller = from;
+  document.getElementById('incomingBox').classList.add('active');
+  document.getElementById('callerInfo').innerText = 'From: ' + from;
+  playSound();
+  vibrate();
+  
+  if(Notification.permission === 'granted'){
+    const notification = new Notification('📳 Incoming Call', {
+      body: 'Call from ' + from,
+      requireInteraction: true,
+      tag: 'incoming-call'
+    });
+    
+    notification.onclick = () => {
+      window.focus();
+      notification.close();
+    };
+  }
+}
+
+// ------------------- DISMISS -------------------
+document.getElementById('dismissBtn').onclick = () => {
+  document.getElementById('incomingBox').classList.remove('active');
+  stopSound();
+  vibrate([50]);
+  
+  // Process next call in queue
+  processNextCall();
+};
+
+// ------------------- CALL BACK -------------------
+document.getElementById('callbackBtn').onclick = () => {
+  if(currentCaller){
+    document.getElementById('partnerId').value = currentCaller;
+    document.getElementById('incomingBox').classList.remove('active');
+    stopSound();
+    vibrate([50]);
+    
+    // Switch to ring tab
+    switchTab(0);
+    
+    // Auto-call after a short delay
+    setTimeout(() => callBtn.click(), 300);
+    
+    // Process next call in queue
+    processNextCall();
+  }
+};
+
+// ------------------- CALL HISTORY -------------------
+function addToHistory(partnerId, type){
+  let history = JSON.parse(localStorage.getItem('CALL_HISTORY') || '[]');
+  
+  history.unshift({
+    partnerId,
+    type,
+    time: Date.now()
+  });
+  
+  // Keep only last 20 calls
+  history = history.slice(0, 20);
+  
+  localStorage.setItem('CALL_HISTORY', JSON.stringify(history));
+  renderHistory();
+}
+
+function renderHistory(){
+  const history = JSON.parse(localStorage.getItem('CALL_HISTORY') || '[]');
+  const container = document.getElementById('historyList');
+  
+  if(history.length === 0){
+    container.innerHTML = '<div class="history-empty">No call history yet</div>';
+    return;
+  }
+  
+  container.innerHTML = history.map((call, i) => {
+    const date = new Date(call.time);
+    const timeStr = date.toLocaleString();
+    const icon = call.type === 'incoming' ? '📲' : '📞';
+    
+    return `
+      <div class="history-item">
+        <div>
+          <div style="font-weight:bold">${icon} ${call.partnerId}</div>
+          <div class="small">${timeStr}</div>
+        </div>
+        <button style="padding:8px 15px;font-size:.9em" onclick="quickCall('${call.partnerId}')">Ring</button>
+      </div>
+    `;
+  }).join('');
+}
+
+function quickCall(partnerId){
+  document.getElementById('partnerId').value = partnerId;
+  switchTab(0);
+  setTimeout(() => callBtn.click(), 300);
+}
+
+function clearHistory(){
+  if(confirm('Clear all call history?')){
+    localStorage.removeItem('CALL_HISTORY');
+    renderHistory();
+    vibrate([50]);
+  }
+}
+
+// ------------------- PAIRING SYSTEM -------------------
+let activePairCode = null;
+
+function generatePairCode(){
+  const code = Math.floor(1000 + Math.random() * 9000).toString();
+  activePairCode = code;
+  
+  // Store in Firebase with expiry
+  db.ref('pairs/' + code).set({
+    deviceId: myId,
+    created: Date.now()
+  });
+  
+  // Auto-expire after 10 minutes
+  setTimeout(() => {
+    if(activePairCode === code){
+      db.ref('pairs/' + code).remove();
+      activePairCode = null;
+    }
+  }, 600000);
+  
+  document.getElementById('pairCode').textContent = code;
+  document.getElementById('pairCodeDisplay').style.display = 'block';
+  vibrate([50]);
+}
+
+async function joinWithCode(){
+  const code = document.getElementById('pairCodeInput').value.trim();
+  if(code.length !== 4) return alert('⚠️ Enter a 4-digit code');
+  
+  try {
+    const snap = await db.ref('pairs/' + code).once('value');
+    const data = snap.val();
+    
+    if(!data){
+      alert('❌ Invalid or expired code');
+      return;
+    }
+    
+    // Check if code is not too old (10 minutes)
+    if(Date.now() - data.created > 600000){
+      alert('❌ This code has expired');
+      db.ref('pairs/' + code).remove();
+      return;
+    }
+    
+    // Set partner ID
+    document.getElementById('partnerId').value = data.deviceId;
+    localStorage.setItem('PARTNER_ID', data.deviceId);
+    
+    // Clean up code
+    db.ref('pairs/' + code).remove();
+    
+    alert('✓ Connected to ' + data.deviceId);
+    switchTab(0);
+    vibrate([50, 50, 50]);
+    
+  } catch(error) {
+    alert('❌ Connection failed: ' + error.message);
+  }
+}
+
+function copyPairCode(){
+  const code = document.getElementById('pairCode').textContent;
+  navigator.clipboard.writeText(code).then(() => {
+    alert('✓ Code copied!');
+    vibrate([50]);
+  });
+}
+
+// ------------------- TAB SWITCHING -------------------
+function switchTab(index){
+  document.querySelectorAll('.tab').forEach((tab, i) => {
+    tab.classList.toggle('active', i === index);
+  });
+  
+  document.querySelectorAll('.tab-content').forEach((content, i) => {
+    content.classList.toggle('active', i === index);
+  });
+  
+  if(index === 2) renderHistory();
+  vibrate([50]);
+}
+
+// ------------------- COPY MY ID -------------------
+function copyMyId(){
+  const myId = document.getElementById('myId').value;
+  navigator.clipboard.writeText(myId).then(() => {
+    alert('✓ Your ID copied!');
+    vibrate([50]);
+  });
+}
+
+// ------------------- CLEANUP OLD PAIR CODES -------------------
+// Clean up codes older than 10 minutes on load
+db.ref('pairs').once('value', snap => {
+  const now = Date.now();
+  snap.forEach(child => {
+    const data = child.val();
+    if(data && now - data.created > 600000){
+      child.ref.remove();
+    }
+  });
+});
+
+// ------------------- INITIAL RENDER -------------------
+renderHistory();
+</script>
+
+</body>
+</html>
