@@ -236,3 +236,4 @@ async function checkForNewCalls() {
 }
 
 console.log('[Service Worker] Service Worker loaded successfully');
+                          
