@@ -1,7 +1,7 @@
 {
   "name": "Partner Ringer Pro",
   "short_name": "Ringer",
-  "description": "Real-time partner calling app",
+  "description": "Real-time partner calling app with notifications",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
