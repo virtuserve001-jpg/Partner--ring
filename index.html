@@ -77,11 +77,11 @@ body{font-family:system-ui;background:#0f172a;color:#f8fafc;min-height:100vh}
                 <h2>Settings</h2>
                 <div style="display:flex;justify-content:space-between;align-items:center;padding:15px 0">
                     <span>🔔 Sound</span>
-                    <div id="soundToggle" style="width:50px;height:26px;background:#10b981;border-radius:13px;position:relative;cursor:pointer">
-                        <div style="width:20px;height:20px;background:white;border-radius:50%;position:absolute;top:3px;right:3px"></div>
+                    <div id="soundToggle" onclick="toggleSound()" style="width:50px;height:26px;background:#10b981;border-radius:13px;position:relative;cursor:pointer">
+    <div style="width:20px;height:20px;background:white;border-radius:50%;position:absolute;top:3px;right:3px"></div>
                     </div>
                 </div>
-                <button class="btn" onclick="testRingtone()" style="background:#475569">Test Ringtone</button>
+                <button id="testRingtoneBtn" class="btn" onclick="testRingtone()" style="background:#475569">Test Ringtone</button>
                 <button class="btn" onclick="resetApp()" style="background:#ef4444;margin-top:20px">Reset App</button>
             </div>
         </div>
@@ -229,9 +229,16 @@ function stopRingtone() {
 }
 
 function testRingtone() {
+    if (!state.settings.sound) {
+        showToast('Sound is disabled. Enable it first.', 'warning');
+        return;
+    }
     playRingtone();
-    setTimeout(stopRingtone, 3000);
-}
+    setTimeout(() => {
+        stopRingtone();
+        showToast('Ringtone test complete', 'info');
+    }, 3000);
+    }
 
 // ========== DETECT ANDROID WRAPPER ==========
 function detectAndroidWrapper() {
@@ -333,7 +340,33 @@ function loadState() {
     
     const settings = localStorage.getItem('ringsync_settings');
     state.settings = settings ? JSON.parse(settings) : {sound: true};
+    // Update toggle UI based on saved settings
+updateToggleUI();
+
+// Test button
+document.getElementById('testRingtoneBtn').onclick = testRingtone;
 }
+    function toggleSound() {
+    state.settings.sound = !state.settings.sound;
+    localStorage.setItem('ringsync_settings', JSON.stringify(state.settings));
+    updateToggleUI();
+    showToast(state.settings.sound ? 'Sound ON' : 'Sound OFF', 'info');
+}
+
+function updateToggleUI() {
+    const toggle = document.getElementById('soundToggle');
+    const slider = toggle.querySelector('div');
+    
+    if (state.settings.sound) {
+        toggle.style.background = '#10b981';
+        slider.style.right = '3px';
+        slider.style.left = 'auto';
+    } else {
+        toggle.style.background = '#475569';
+        slider.style.right = 'auto';
+        slider.style.left = '3px';
+    }
+    }
 
 function switchTab(tab) {
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
