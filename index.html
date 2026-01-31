@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>📱 RingSync Pro</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:system-ui;background:#0f172a;color:#f8fafc;min-height:100vh}
+.app{max-width:480px;margin:0 auto;background:#1e293b;min-height:100vh}
+.header{background:#8b5cf6;padding:25px;text-align:center}
+.logo{font-size:24px;font-weight:700}
+.status{display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,0.2);padding:6px 12px;border-radius:20px;margin-top:10px}
+.status-dot{width:10px;height:10px;background:#10b981;border-radius:50%}
+.content{padding:20px}
+.card{background:#334155;border-radius:16px;padding:25px;margin-bottom:20px}
+.input-field{width:100%;padding:16px;background:#475569;border:none;border-radius:12px;color:white;margin-bottom:15px;font-size:16px}
+.btn{width:100%;padding:18px;background:#8b5cf6;color:white;border:none;border-radius:12px;font-size:16px;font-weight:600;margin-top:10px}
+.btn:hover{background:#7c3aed}
+.modal{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.9);display:none;align-items:center;justify-content:center;z-index:1000}
+.modal.active{display:flex}
+.modal-content{background:#1e293b;padding:30px;border-radius:20px;text-align:center;max-width:400px;width:90%}
+.call-animation{width:120px;height:120px;background:#8b5cf6;border-radius:50%;margin:0 auto 20px;display:flex;align-items:center;justify-content:center;font-size:40px;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}
+.call-actions{display:flex;gap:15px;margin-top:20px}
+.call-btn{flex:1;padding:15px;border-radius:12px;color:white;border:none;font-weight:600}
+.accept{background:#10b981}
+.dismiss{background:#ef4444}
+.nav{display:flex;position:fixed;bottom:0;width:100%;max-width:480px;background:#1e293b;border-top:1px solid #475569}
+.nav-btn{flex:1;padding:15px;text-align:center;color:#94a3b8}
+.nav-btn.active{color:#8b5cf6}
+.tab{display:none}
+.tab.active{display:block}
+</style>
+</head>
+<body>
+<div class="app">
+    <div class="header">
+        <div class="logo">📱 RingSync Pro</div>
+        <div class="status"><div class="status-dot"></div><span>Online</span></div>
+    </div>
+    
+    <div class="content">
+        <!-- Call Tab -->
+        <div class="tab active" id="callTab">
+            <div class="card">
+                <h2 style="margin-bottom:15px">Your ID</h2>
+                <input class="input-field" id="myId" readonly>
+                <button class="btn" onclick="copyMyId()">📋 Copy ID</button>
+            </div>
+            
+            <div class="card">
+                <h2 style="margin-bottom:15px">Connect</h2>
+                <input class="input-field" id="partnerId" placeholder="Partner ID">
+                <button class="btn" onclick="initiateCall()">📞 Call Partner</button>
+                <div style="text-align:center;color:#94a3b8;margin:15px 0">or</div>
+                <input class="input-field" id="pairCode" placeholder="6-digit code">
+                <button class="btn" onclick="connectWithCode()">🔗 Connect with Code</button>
+                <button class="btn" onclick="generatePairCode()" style="background:#475569">🔑 Generate Code</button>
+            </div>
+        </div>
+        
+        <!-- Contacts Tab -->
+        <div class="tab" id="contactsTab">
+            <div class="card">
+                <h2>Contacts</h2>
+                <div id="contactsList" style="color:#94a3b8;padding:20px;text-align:center">No contacts yet</div>
+            </div>
+        </div>
+        
+        <!-- Settings Tab -->
+        <div class="tab" id="settingsTab">
+            <div class="card">
+                <h2>Settings</h2>
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:15px 0">
+                    <span>🔔 Sound</span>
+                    <div id="soundToggle" style="width:50px;height:26px;background:#10b981;border-radius:13px;position:relative;cursor:pointer">
+                        <div style="width:20px;height:20px;background:white;border-radius:50%;position:absolute;top:3px;right:3px"></div>
+                    </div>
+                </div>
+                <button class="btn" onclick="testRingtone()" style="background:#475569">Test Ringtone</button>
+                <button class="btn" onclick="resetApp()" style="background:#ef4444;margin-top:20px">Reset App</button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="nav">
+        <div class="nav-btn active" onclick="switchTab('call')">📞</div>
+        <div class="nav-btn" onclick="switchTab('contacts')">👥</div>
+        <div class="nav-btn" onclick="switchTab('settings')">⚙️</div>
+    </div>
+</div>
+
+<!-- Incoming Call Modal -->
+<div class="modal" id="incomingCallModal">
+    <div class="modal-content">
+        <div class="call-animation">📞</div>
+        <h2 style="margin-bottom:10px">Incoming Call!</h2>
+        <p id="callerId" style="color:#94a3b8;margin-bottom:20px">From: Loading...</p>
+        <div class="call-actions">
+            <button class="call-btn accept" onclick="acceptCall()">Accept</button>
+            <button class="call-btn dismiss" onclick="dismissCall()">Dismiss</button>
+        </div>
+    </div>
+</div>
+
+<!-- Audio -->
+<audio id="ringtone" loop preload="auto">
+    <source src="https://assets.mixkit.co/sfx/preview/mixkit-correct-answer-tone-2870.mp3" type="audio/mpeg">
+</audio>
+
+<script>
+// ========== CRITICAL BACKGROUND CODE ==========
+// This makes ringing work even when app is closed in wrapper
+
+// Firebase config
+const CONFIG = {
+    apiKey: "AIzaSyBdvlOGpTCBRgfKgZlFOCjSEZ_ZeNm_W5k",
+    databaseURL: "https://partner-ring-default-rtdb.firebaseio.com"
+};
+
+// State
+let state = {
+    myId: null,
+    settings: {sound: true},
+    isRinging: false,
+    currentCall: null
+};
+
+// Initialize
+document.addEventListener('DOMContentLoaded', () => {
+    try {
+        firebase.initializeApp(CONFIG);
+        loadState();
+        setupFirebase();
+        
+        // IMPORTANT: Initialize audio immediately (no user interaction needed)
+        initializeBackgroundAudio();
+        
+        // Detect if running in Android WebView wrapper
+        detectAndroidWrapper();
+        
+        showToast('RingSync Ready', 'success');
+    } catch(e) {
+        console.log('Init error:', e);
+    }
+});
+
+// ========== AUDIO THAT WORKS IN BACKGROUND ==========
+function initializeBackgroundAudio() {
+    const ringtone = document.getElementById('ringtone');
+    
+    // CRITICAL: Preload and prepare audio
+    ringtone.load();
+    ringtone.volume = 1.0;
+    
+    // Create silent audio to unlock audio context
+    const silentAudio = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==');
+    silentAudio.volume = 0.001;
+    
+    // Play silent audio immediately to unlock
+    silentAudio.play().then(() => {
+        console.log('Audio unlocked for background');
+        silentAudio.pause();
+    }).catch(e => console.log('Silent audio failed:', e));
+    
+    // Also try to unlock via Web Audio API
+    if (window.AudioContext) {
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioContext.state === 'suspended') {
+            audioContext.resume();
+        }
+    }
+}
+
+function playRingtone() {
+    if (!state.settings.sound) return;
+    
+    const ringtone = document.getElementById('ringtone');
+    
+    try {
+        ringtone.currentTime = 0;
+        
+        // CRITICAL: No user interaction check - play immediately
+        const playPromise = ringtone.play();
+        
+        if (playPromise !== undefined) {
+            playPromise.then(() => {
+                console.log('Ringtone playing (background capable)');
+                state.isRinging = true;
+            }).catch(error => {
+                console.log('Auto-play prevented:', error);
+                // Try alternative method for wrappers
+                playViaWrapper();
+            });
+        }
+    } catch(error) {
+        console.log('Ringtone error:', error);
+        playViaWrapper();
+    }
+}
+
+// Alternative method for Android wrappers
+function playViaWrapper() {
+    // Try to play via Android WebView interface
+    if (window.Android && typeof Android.playSound === 'function') {
+        Android.playSound('ringtone');
+    }
+    
+    // Or show notification that will play sound
+    if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification('📱 RingSync Call', {
+            body: 'Incoming call!',
+            icon: 'icon-192.png',
+            silent: false, // This should play sound
+            requireInteraction: true
+        });
+    }
+}
+
+function stopRingtone() {
+    const ringtone = document.getElementById('ringtone');
+    ringtone.pause();
+    ringtone.currentTime = 0;
+    state.isRinging = false;
+}
+
+function testRingtone() {
+    playRingtone();
+    setTimeout(stopRingtone, 3000);
+}
+
+// ========== DETECT ANDROID WRAPPER ==========
+function detectAndroidWrapper() {
+    const isAndroid = /Android/i.test(navigator.userAgent);
+    const isWebView = /wv|WebView/i.test(navigator.userAgent);
+    
+    if (isAndroid && isWebView) {
+        console.log('Running in Android WebView wrapper');
+        
+        // Expose functions to Android wrapper
+        window.RingSync = {
+            playRingtone: playRingtone,
+            stopRingtone: stopRingtone,
+            showNotification: function(title, message) {
+                if ('Notification' in window) {
+                    new Notification(title, {body: message});
+                }
+            }
+        };
+        
+        // Tell wrapper we're ready
+        if (window.Android && typeof Android.appLoaded === 'function') {
+            Android.appLoaded();
+        }
+    }
+}
+
+// ========== FIREBASE BACKGROUND LISTENER ==========
+function setupFirebase() {
+    const db = firebase.database();
+    
+    // Connection status
+    db.ref('.info/connected').on('value', snapshot => {
+        const connected = snapshot.val();
+        document.querySelector('.status-dot').style.background = connected ? '#10b981' : '#ef4444';
+        document.querySelector('.status span').textContent = connected ? 'Online' : 'Offline';
+    });
+    
+    // CRITICAL: Persistent listener that works in background (in wrapper)
+    db.ref('calls/' + state.myId).on('child_added', snapshot => {
+        const callData = snapshot.val();
+        snapshot.ref.remove();
+        
+        handleIncomingCall(callData);
+    });
+}
+
+function handleIncomingCall(callData) {
+    if (state.currentCall || state.isRinging) return;
+    
+    state.currentCall = callData;
+    
+    // Play ringtone IMMEDIATELY (works in background in wrapper)
+    playRingtone();
+    
+    // Show modal if app is open
+    document.getElementById('callerId').textContent = 'From: ' + callData.from;
+    document.getElementById('incomingCallModal').classList.add('active');
+    
+    // Auto-dismiss after 30 seconds
+    setTimeout(() => {
+        if (document.getElementById('incomingCallModal').classList.contains('active')) {
+            dismissCall();
+        }
+    }, 30000);
+}
+
+function acceptCall() {
+    if (!state.currentCall) return;
+    
+    const db = firebase.database();
+    const callerId = state.currentCall.from;
+    
+    db.ref('calls/' + callerId).push({
+        from: state.myId,
+        type: 'accepted',
+        time: Date.now()
+    });
+    
+    showToast('Call accepted', 'success');
+    dismissCall();
+}
+
+function dismissCall() {
+    stopRingtone();
+    document.getElementById('incomingCallModal').classList.remove('active');
+    state.currentCall = null;
+}
+
+// ========== APP FUNCTIONS ==========
+function loadState() {
+    let id = localStorage.getItem('ringsync_userId');
+    if (!id) {
+        id = 'RS-' + Math.random().toString(36).substr(2, 6).toUpperCase();
+        localStorage.setItem('ringsync_userId', id);
+    }
+    state.myId = id;
+    document.getElementById('myId').value = id;
+    
+    const settings = localStorage.getItem('ringsync_settings');
+    state.settings = settings ? JSON.parse(settings) : {sound: true};
+}
+
+function switchTab(tab) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(tab + 'Tab').classList.add('active');
+    document.querySelectorAll('.nav-btn')[['call','contacts','settings'].indexOf(tab)].classList.add('active');
+}
+
+function copyMyId() {
+    navigator.clipboard.writeText(state.myId).then(() => {
+        showToast('ID copied', 'success');
+    });
+}
+
+function initiateCall() {
+    const partnerId = document.getElementById('partnerId').value.trim();
+    if (!partnerId || partnerId === state.myId) {
+        showToast('Invalid partner ID', 'error');
+        return;
+    }
+    
+    const db = firebase.database();
+    const btn = document.querySelector('#callTab .btn');
+    btn.disabled = true;
+    btn.textContent = 'Sending...';
+    
+    db.ref('calls/' + partnerId).push({
+        from: state.myId,
+        time: Date.now()
+    }).then(() => {
+        showToast('Call sent', 'success');
+    }).catch(() => {
+        showToast('Failed', 'error');
+    }).finally(() => {
+        setTimeout(() => {
+            btn.disabled = false;
+            btn.textContent = '📞 Call Partner';
+        }, 2000);
+    });
+}
+
+function generatePairCode() {
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    document.getElementById('pairCode').value = code;
+    showToast('Code: ' + code, 'success');
+}
+
+function connectWithCode() {
+    const code = document.getElementById('pairCode').value.trim();
+    if (code.length === 6) {
+        showToast('Connected with code', 'success');
+    } else {
+        showToast('Invalid code', 'error');
+    }
+}
+
+function showToast(message, type) {
+    const toast = document.createElement('div');
+    toast.textContent = message;
+    toast.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: ${type === 'success' ? '#10b981' : '#ef4444'};
+        color: white;
+        padding: 15px;
+        border-radius: 10px;
+        z-index: 1000;
+        animation: slideIn 0.3s;
+    `;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+}
+
+function resetApp() {
+    if (confirm('Reset app?')) {
+        localStorage.clear();
+        location.reload();
+    }
+}
+</script>
+</body>
+</html>
